@@ -77,6 +77,13 @@ Host := {
 	gamepad : Host, Gamepad.GamepadId -> [Connected(Gamepad.ConnectedPad), Disconnected]
 	gamepad = |host, id| Gamepad.lookup(host.gamepads, id)
 
+	## Program arguments passed to the app binary, in order, excluding the
+	## host's own flags (--headless and friends). Everything after a literal
+	## `--` is included verbatim. Empty when none were given.
+	## Receiver form: `host.args!()`.
+	args! : Host => List(Str)
+	args! = |_host| HostHost.args!()
+
 	## Exit the application with the given exit code.
 	## The exit happens after the current frame completes to allow proper cleanup.
 	exit! : Host, I32 => {}

@@ -81,6 +81,7 @@ platform ""
 		"roc_capture_start_recording": CaptureHost.start_recording!,
 		"roc_capture_stop_recording": CaptureHost.stop_recording!,
 		"roc_capture_recording_status": CaptureHost.recording_status!,
+		"roc_host_args": HostHost.args!,
 		"roc_host_exit": HostHost.exit!,
 		"roc_host_get_clipboard_text": HostHost.get_clipboard_text!,
 		"roc_host_random_i32": HostHost.random_i32!,

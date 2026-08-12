@@ -4,7 +4,9 @@ Make native games, visual tools, and interactive apps in [Roc](https://www.roc-l
 
 > **About this fork** ([ricardo-valero/roc-ray](https://github.com/ricardo-valero/roc-ray)):
 > adds binary file I/O (`Host.read_bytes!` / `Host.write_bytes!`, exercised by
-> `examples/file_io.roc`) for [roc-ngb-emu](https://github.com/ricardo-valero/roc-ngb-emu)
+> `examples/file_io.roc`) and program arguments (`Host.args!` — positional
+> argv entries and everything after `--`; the host's own flags keep working)
+> for [roc-ngb-emu](https://github.com/ricardo-valero/roc-ngb-emu)
 > and roc-nes-emu — runtime ROM loading and battery saves. A PCM audio-stream
 > API is planned next. Only macOS arm64 hosts are built and tested here.
 > `.roc-version` pins the nightly this fork pairs with (numeric-month form, as

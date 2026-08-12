@@ -19,6 +19,7 @@ HostHost := [].{
 		contents : List(U8),
 	}
 
+	args! : () => List(Str)
 	exit! : I32 => {}
 	get_clipboard_text! : () => Try(Str, [Unavailable])
 	read_bytes! : Str => ReadBytesResult

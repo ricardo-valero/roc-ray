@@ -62,6 +62,7 @@ const TEXTURE_UPDATE_NOT_MUTABLE: u8 = 2;
 const TRY_TAG_OK: u8 = 1;
 const MAX_HOST_TEXT_FILE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_HOST_BINARY_FILE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_APP_ARGS: usize = 64;
 const HEADLESS_CLIPBOARD_CAPACITY: usize = 4096;
 
 extern fn app_config_for_host() callconv(.c) AppConfig;
@@ -2071,6 +2072,20 @@ fn exportedWriteBytesRaw(args: HostWriteBytesRawArgs) callconv(.c) u8 {
     return hostedWriteBytesRaw(activeHost(), args);
 }
 
+fn hostedArgs(roc_host: *RocHost) callconv(.c) abi.RocList(abi.RocStr) {
+    const list = abi.RocList(abi.RocStr).allocate(app_args_count, roc_host);
+    if (list.elements_ptr) |elements| {
+        for (app_args_buf[0..app_args_count], 0..) |arg, i| {
+            elements[i] = abi.RocStr.fromSlice(arg, roc_host);
+        }
+    }
+    return list;
+}
+
+fn exportedArgs() callconv(.c) abi.RocList(abi.RocStr) {
+    return hostedArgs(activeHost());
+}
+
 fn hostedTilemapLoadTmxRaw(roc_host: *RocHost, path_arg: abi.RocStr) callconv(.c) TilemapLoadTmxRawResult {
     defer path_arg.decref(roc_host);
 
@@ -3073,6 +3088,7 @@ comptime {
         @export(&exportedDrawTextRaw, .{ .name = "roc_draw_text_raw" });
         @export(&hostedDrawTriangleLinesRaw, .{ .name = "roc_draw_triangle_lines_raw" });
         @export(&hostedDrawTriangleRaw, .{ .name = "roc_draw_triangle_raw" });
+        @export(&exportedArgs, .{ .name = "roc_host_args" });
         @export(&hostedExit, .{ .name = "roc_host_exit" });
         @export(&exportedGetClipboardText, .{ .name = "roc_host_get_clipboard_text" });
         @export(&hostedRandomI32, .{ .name = "roc_host_random_i32" });
@@ -3206,7 +3222,21 @@ const InputState = struct {
 };
 
 fn printUsage() void {
-    std.debug.print("usage: app [--headless] [--headless-frames=N] [--debug-allocator]\n", .{});
+    std.debug.print("usage: app [app-args...] [--headless] [--headless-frames=N] [--debug-allocator]\n", .{});
+    std.debug.print("  positional arguments (and everything after --) reach the app via Host.args!\n", .{});
+}
+
+/// Positional argv entries (argv memory outlives the app, so spans are safe).
+var app_args_buf: [MAX_APP_ARGS][]const u8 = undefined;
+var app_args_count: usize = 0;
+
+fn appendAppArg(arg: []const u8) !void {
+    if (app_args_count >= MAX_APP_ARGS) {
+        std.debug.print("too many app arguments (max {d})\n", .{MAX_APP_ARGS});
+        return error.InvalidArgument;
+    }
+    app_args_buf[app_args_count] = arg;
+    app_args_count += 1;
 }
 
 fn parseRuntimeOptions(argc: usize, argv: [*][*:0]u8) !RuntimeOptions {
@@ -3214,7 +3244,15 @@ fn parseRuntimeOptions(argc: usize, argv: [*][*:0]u8) !RuntimeOptions {
     var i: usize = 1;
     while (i < argc) : (i += 1) {
         const arg = std.mem.span(argv[i]);
-        if (std.mem.eql(u8, arg, "--headless")) {
+        if (std.mem.eql(u8, arg, "--")) {
+            i += 1;
+            while (i < argc) : (i += 1) {
+                try appendAppArg(std.mem.span(argv[i]));
+            }
+            break;
+        } else if (!std.mem.startsWith(u8, arg, "-")) {
+            try appendAppArg(arg);
+        } else if (std.mem.eql(u8, arg, "--headless")) {
             options.headless = true;
         } else if (std.mem.startsWith(u8, arg, "--headless-frames=")) {
             options.headless = true;

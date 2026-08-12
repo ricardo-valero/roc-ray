@@ -8786,6 +8786,12 @@ pub extern fn roc_draw_triangle_lines_raw(arg0: DrawHostTriangle_linesArgs) call
 /// Roc signature: I32 => {}
 pub extern fn roc_host_exit(arg0: i32) callconv(.c) void;
 
+/// Hosted symbol for HostHost.args!
+/// Roc signature: {} => List(Str)
+/// Fork addition: hand-written to match glue conventions (roc glue cannot
+/// link on this machine).
+pub extern fn roc_host_args() callconv(.c) RocList(RocStr);
+
 /// Hosted symbol for HostHost.get_clipboard_text!
 /// Roc signature: {} => Try(Str, [Unavailable])
 pub extern fn roc_host_get_clipboard_text() callconv(.c) HostHostGet_clipboard_textResult;
