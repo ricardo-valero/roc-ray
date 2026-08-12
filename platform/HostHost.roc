@@ -8,8 +8,20 @@ HostHost := [].{
 		contents : Str,
 	}
 
+	ReadBytesResult : {
+		ok : Bool,
+		err : U8,
+		contents : List(U8),
+	}
+
+	WriteBytes : {
+		path : Str,
+		contents : List(U8),
+	}
+
 	exit! : I32 => {}
 	get_clipboard_text! : () => Try(Str, [Unavailable])
+	read_bytes! : Str => ReadBytesResult
 	read_env! : Str => Try(Str, [NotFound])
 	read_file! : Str => ReadFileResult
 	random_i32! : I32, I32 => I32
@@ -18,4 +30,5 @@ HostHost := [].{
 	set_screen_size! : { width : I32, height : I32 } => Try({}, [NotSupported])
 	set_target_fps! : I32 => {}
 	set_window_min_size! : { width : I32, height : I32 } => {}
+	write_bytes! : WriteBytes => U8
 }

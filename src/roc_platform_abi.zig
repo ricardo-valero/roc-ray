@@ -6331,6 +6331,55 @@ comptime {
     }
 }
 
+/// Return type record for HostHost.read_bytes!
+/// Fields ordered by compiler-emitted ABI offsets.
+/// Fork addition: hand-written to match glue conventions (roc glue cannot
+/// link on this machine); layout mirrors HostHostRead_fileRetRecord with a
+/// byte list in place of the string.
+pub const HostHostRead_bytesRetRecord = if (@sizeOf(usize) == 4) extern struct {
+    contents: RocListWith(u8, false),
+    err: u8,
+    ok: bool,
+} else extern struct {
+    contents: RocListWith(u8, false),
+    err: u8,
+    ok: bool,
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(HostHostRead_bytesRetRecord) != 32) @compileError("HostHostRead_bytesRetRecord size mismatch");
+        if (@alignOf(HostHostRead_bytesRetRecord) != 8) @compileError("HostHostRead_bytesRetRecord alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(HostHostRead_bytesRetRecord) != 16) @compileError("HostHostRead_bytesRetRecord size mismatch");
+        if (@alignOf(HostHostRead_bytesRetRecord) != 4) @compileError("HostHostRead_bytesRetRecord alignment mismatch");
+    }
+}
+
+/// Arguments for HostHost.write_bytes!
+/// Fields ordered by compiler-emitted ABI offsets.
+/// Fork addition: hand-written to match glue conventions (roc glue cannot
+/// link on this machine).
+pub const HostHostWrite_bytesArgs = if (@sizeOf(usize) == 4) extern struct {
+    contents: RocListWith(u8, false),
+    path: RocStr,
+} else extern struct {
+    contents: RocListWith(u8, false),
+    path: RocStr,
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(HostHostWrite_bytesArgs) != 48) @compileError("HostHostWrite_bytesArgs size mismatch");
+        if (@alignOf(HostHostWrite_bytesArgs) != 8) @compileError("HostHostWrite_bytesArgs alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(HostHostWrite_bytesArgs) != 24) @compileError("HostHostWrite_bytesArgs size mismatch");
+        if (@alignOf(HostHostWrite_bytesArgs) != 4) @compileError("HostHostWrite_bytesArgs alignment mismatch");
+    }
+}
+
 /// Return type record for TilemapHost.load_tmx!
 /// Fields ordered by compiler-emitted ABI offsets.
 pub const TilemapHostLoad_tmxRetRecord = if (@sizeOf(usize) == 4) extern struct {
@@ -8749,9 +8798,17 @@ pub extern fn roc_host_random_i32(arg0: i32, arg1: i32) callconv(.c) i32;
 /// Roc signature: Str => Try(Str, [NotFound])
 pub extern fn roc_host_read_env(arg0: RocStr) callconv(.c) HostHostRead_envResult;
 
+/// Hosted symbol for HostHost.read_bytes!
+/// Roc signature: Str => { contents : List(U8), err : U8, ok : Bool }
+pub extern fn roc_host_read_bytes_raw(arg0: RocStr) callconv(.c) HostHostRead_bytesRetRecord;
+
 /// Hosted symbol for HostHost.read_file!
 /// Roc signature: Str => { contents : Str, err : U8, ok : Bool }
 pub extern fn roc_host_read_file_raw(arg0: RocStr) callconv(.c) __AnonStruct_1504326a3d41a158;
+
+/// Hosted symbol for HostHost.write_bytes!
+/// Roc signature: { contents : List(U8), path : Str } => U8
+pub extern fn roc_host_write_bytes_raw(arg0: HostHostWrite_bytesArgs) callconv(.c) u8;
 
 /// Hosted symbol for HostHost.set_clipboard_text!
 /// Roc signature: Str => {}

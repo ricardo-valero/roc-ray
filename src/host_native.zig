@@ -31,6 +31,8 @@ const ReadEnvResult = abi.HostHostRead_envResult;
 const ClipboardTextResult = abi.HostHostGet_clipboard_textResult;
 const ClipboardTextResultTag = abi.HostHostGet_clipboard_textResultTag;
 const HostReadFileRawResult = abi.HostHostRead_fileRetRecord;
+const HostReadBytesRawResult = abi.HostHostRead_bytesRetRecord;
+const HostWriteBytesRawArgs = abi.HostHostWrite_bytesArgs;
 const TilemapLoadTmxRawResult = abi.TilemapHostLoad_tmxRetRecord;
 const AppConfig = abi.App_config_for_host;
 const TilemapRawMap = abi.TilemapHostLoad_tmxMap;
@@ -43,6 +45,7 @@ const TilemapRawTileset = abi.TilemapHostLoad_tmxMapTilesets;
 
 const HOST_ERR_NOT_FOUND: u8 = 1;
 const HOST_ERR_READ_FAILED: u8 = 2;
+const HOST_ERR_WRITE_FAILED: u8 = 1;
 const TILEMAP_ERR_NOT_FOUND: u8 = 1;
 const TILEMAP_ERR_READ_FAILED: u8 = 2;
 const TILEMAP_ERR_PARSE_FAILED: u8 = 3;
@@ -58,6 +61,7 @@ const TEXTURE_UPDATE_PIXEL_COUNT: u8 = 1;
 const TEXTURE_UPDATE_NOT_MUTABLE: u8 = 2;
 const TRY_TAG_OK: u8 = 1;
 const MAX_HOST_TEXT_FILE_BYTES: usize = 16 * 1024 * 1024;
+const MAX_HOST_BINARY_FILE_BYTES: usize = 64 * 1024 * 1024;
 const HEADLESS_CLIPBOARD_CAPACITY: usize = 4096;
 
 extern fn app_config_for_host() callconv(.c) AppConfig;
@@ -470,6 +474,10 @@ fn defaultIo() std.Io {
 
 fn emptyHostReadFileRawResult() HostReadFileRawResult {
     return .{ .contents = abi.RocStr.empty(), .err = 0, .ok = false };
+}
+
+fn emptyHostReadBytesRawResult() HostReadBytesRawResult {
+    return .{ .contents = abi.RocListWith(u8, false).empty(), .err = 0, .ok = false };
 }
 
 fn emptyTilemapRawMap() TilemapRawMap {
@@ -2011,6 +2019,58 @@ fn exportedReadFileRaw(path_arg: abi.RocStr) callconv(.c) HostReadFileRawResult 
     return hostedReadFileRaw(activeHost(), path_arg);
 }
 
+fn hostedReadBytesRaw(roc_host: *RocHost, path_arg: abi.RocStr) callconv(.c) HostReadBytesRawResult {
+    defer path_arg.decref(roc_host);
+
+    const allocator = allocatorFromHost(roc_host);
+    const path = path_arg.asSlice();
+    const bytes = std.Io.Dir.cwd().readFileAlloc(defaultIo(), path, allocator, .limited(MAX_HOST_BINARY_FILE_BYTES)) catch |err| {
+        var result = emptyHostReadBytesRawResult();
+        result.err = switch (err) {
+            error.FileNotFound => HOST_ERR_NOT_FOUND,
+            else => HOST_ERR_READ_FAILED,
+        };
+        return result;
+    };
+    defer allocator.free(bytes);
+
+    return .{
+        .contents = abi.RocListWith(u8, false).fromSlice(bytes, roc_host),
+        .err = 0,
+        .ok = true,
+    };
+}
+
+fn exportedReadBytesRaw(path_arg: abi.RocStr) callconv(.c) HostReadBytesRawResult {
+    return hostedReadBytesRaw(activeHost(), path_arg);
+}
+
+fn hostedWriteBytesRaw(roc_host: *RocHost, args: HostWriteBytesRawArgs) callconv(.c) u8 {
+    defer args.path.decref(roc_host);
+    defer args.contents.decref(roc_host);
+
+    const allocator = allocatorFromHost(roc_host);
+    const path = args.path.asSlice();
+    const contents = args.contents.items();
+
+    // Atomic replace: write a sibling temp file, then rename it over the
+    // target so a crash mid-write never leaves a partial file behind.
+    const tmp_path = std.fmt.allocPrint(allocator, "{s}.tmp", .{path}) catch return HOST_ERR_WRITE_FAILED;
+    defer allocator.free(tmp_path);
+
+    const io = defaultIo();
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = tmp_path, .data = contents }) catch return HOST_ERR_WRITE_FAILED;
+    std.Io.Dir.cwd().rename(tmp_path, std.Io.Dir.cwd(), path, io) catch {
+        std.Io.Dir.cwd().deleteFile(io, tmp_path) catch {};
+        return HOST_ERR_WRITE_FAILED;
+    };
+    return 0;
+}
+
+fn exportedWriteBytesRaw(args: HostWriteBytesRawArgs) callconv(.c) u8 {
+    return hostedWriteBytesRaw(activeHost(), args);
+}
+
 fn hostedTilemapLoadTmxRaw(roc_host: *RocHost, path_arg: abi.RocStr) callconv(.c) TilemapLoadTmxRawResult {
     defer path_arg.decref(roc_host);
 
@@ -3017,7 +3077,9 @@ comptime {
         @export(&exportedGetClipboardText, .{ .name = "roc_host_get_clipboard_text" });
         @export(&hostedRandomI32, .{ .name = "roc_host_random_i32" });
         @export(if (builtin.os.tag == .windows) &exportedReadEnvWindows else &exportedReadEnvPosix, .{ .name = "roc_host_read_env" });
+        @export(&exportedReadBytesRaw, .{ .name = "roc_host_read_bytes_raw" });
         @export(&exportedReadFileRaw, .{ .name = "roc_host_read_file_raw" });
+        @export(&exportedWriteBytesRaw, .{ .name = "roc_host_write_bytes_raw" });
         @export(&exportedSetClipboardText, .{ .name = "roc_host_set_clipboard_text" });
         @export(&hostedSetExitKey, .{ .name = "roc_host_set_exit_key" });
         @export(&exportedCaptureScreenshot, .{ .name = "roc_capture_screenshot" });

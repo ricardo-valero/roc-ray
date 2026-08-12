@@ -2,6 +2,19 @@
 
 Make native games, visual tools, and interactive apps in [Roc](https://www.roc-lang.org/), powered by [raylib](https://www.raylib.com/).
 
+> **About this fork** ([ricardo-valero/roc-ray](https://github.com/ricardo-valero/roc-ray)):
+> adds binary file I/O (`Host.read_bytes!` / `Host.write_bytes!`, exercised by
+> `examples/file_io.roc`) for [roc-ngb-emu](https://github.com/ricardo-valero/roc-ngb-emu)
+> and roc-nes-emu — runtime ROM loading and battery saves. A PCM audio-stream
+> API is planned next. Only macOS arm64 hosts are built and tested here.
+> `.roc-version` pins the nightly this fork pairs with (numeric-month form, as
+> the [roc-overlay](https://github.com/roc-lang/roc-overlay) nightlies report it;
+> upstream's glue scripts expect the older spelled-month form). The Zig ABI
+> additions in `src/roc_platform_abi.zig` are hand-written to glue conventions
+> because `roc glue` cannot currently link on the maintenance machine. After
+> rebuilding the host with `zig build`, pass `--no-cache` to `roc build` or a
+> stale cached host may mask your change.
+
 ![Launching Cave Climb from a terminal, followed by gameplay with animated sprites and a mouse-controlled laser](examples/roc-ray-showcase.webp)
 
 *Cave Climb combines an authored tilemap, sprites, camera movement, collision

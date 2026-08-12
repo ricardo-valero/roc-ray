@@ -91,6 +91,21 @@ Host := {
 			Err(NotFound) => Err(NotFound)
 		}
 
+	## Read a file from disk as raw bytes.
+	## Unlike `read_file!`, the contents are not required to be UTF-8.
+	## Receiver form: `host.read_bytes!(path)`.
+	read_bytes! : Host, Str => Try(List(U8), [NotFound, ReadFailed, ..])
+	read_bytes! = |_host, path| {
+		result = HostHost.read_bytes!(path)
+		if result.ok {
+			Ok(result.contents)
+		} else if result.err == 1 {
+			Err(NotFound)
+		} else {
+			Err(ReadFailed)
+		}
+	}
+
 	## Read a UTF-8 text file from disk.
 	## Receiver form: `host.read_file!(path)`.
 	read_file! : Host, Str => Try(Str, [NotFound, ReadFailed, ..])
@@ -104,6 +119,19 @@ Host := {
 			Err(ReadFailed)
 		}
 	}
+
+	## Write raw bytes to a file on disk, replacing any existing contents.
+	## The write is atomic: bytes land in a sibling temporary file that is
+	## renamed over the target, so a crash mid-write never leaves a partial
+	## file behind. The parent directory must already exist.
+	## Receiver form: `host.write_bytes!(path, contents)`.
+	write_bytes! : Host, Str, List(U8) => Try({}, [WriteFailed, ..])
+	write_bytes! = |_host, path, contents|
+		if HostHost.write_bytes!({ path, contents }) == 0 {
+			Ok({})
+		} else {
+			Err(WriteFailed)
+		}
 
 	## Get a random integer in the range [min, max] (both endpoints included).
 	## The generator is seeded once at startup, so sequences differ between runs.

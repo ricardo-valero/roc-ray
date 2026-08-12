@@ -123,3 +123,7 @@ examples/capture_ui_demo
 # Output written by the capture examples
 captures/
 shots/
+
+# file_io example round-trip artifact
+examples/assets/file_io_roundtrip.bin
+examples/assets/file_io_roundtrip.bin.tmp
