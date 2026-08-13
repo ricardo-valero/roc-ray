@@ -231,11 +231,10 @@ const ShaderResource = union(enum) {
     native: raylib.Shader,
 };
 
-/// PCM stream: the drop-oldest ring buffers pushes in both modes; `native` is
-/// null when headless (ring bookkeeping still observable via buffered depth).
+/// PCM stream: the backend owns the slot (ring + device stream + audio-thread
+/// callback); the heap entry just ties the slot's lifetime to the Roc box.
 const StreamResource = struct {
-    ring: raylib.StreamRing,
-    native: ?raylib.AudioStream,
+    slot: usize,
 };
 
 const TilemapQuadProbe = tilemap_batch.Quad;
@@ -288,9 +287,7 @@ fn destroyShader(resource: *ShaderResource) void {
 }
 
 fn destroyStream(resource: *StreamResource) void {
-    if (resource.native) |stream| {
-        if (!builtin.is_test) raylib.unloadStream(stream);
-    }
+    raylib.closeStream(resource.slot);
 }
 
 fn writeU64Token(payload: *u64, token: u64) void {
@@ -1233,7 +1230,7 @@ test "every fixed resource heap reports capacity plus one as ResourceLimit" {
     for (sounds) |sound| releaseResourceBox(&roc_host, sound);
 
     var streams: [4]*u64 = undefined;
-    for (&streams) |*item| item.* = storeStream(.{ .ring = .{}, .native = null }).?;
+    for (&streams) |*item| item.* = storeStream(.{ .slot = raylib.openStream(48000, 2, true).? }).?;
     try std.testing.expectEqual(RESOURCE_ERR_LIMIT, hostedAudioCreateStream(.{ .channels = 2, .sample_rate = 48000 }).err);
     for (streams) |item| releaseResourceBox(&roc_host, item);
 
@@ -3027,15 +3024,11 @@ fn hostedAudioSetMasterVolume(volume: f32) callconv(.c) void {
 fn hostedAudioCreateStream(args: abi.AudioHostCreate_streamArgs) callconv(.c) abi.AudioHostCreate_streamRetRecord {
     if (args.sample_rate == 0 or args.channels < 1 or args.channels > raylib.STREAM_MAX_CHANNELS)
         return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_FAILED };
-    const ring: raylib.StreamRing = .{ .channels = args.channels };
-    if (headlessMode()) {
-        const stored = storeStream(.{ .ring = ring, .native = null }) orelse
-            return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_LIMIT };
-        return .{ .stream = stored, .err = RESOURCE_ERR_NONE };
-    }
-    const native = raylib.loadStream(args.sample_rate, args.channels) orelse
+    if (stream_heap.active() >= raylib.STREAM_SLOTS)
+        return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_LIMIT };
+    const slot = raylib.openStream(args.sample_rate, args.channels, headlessMode()) orelse
         return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_FAILED };
-    const stored = storeStream(.{ .ring = ring, .native = native }) orelse
+    const stored = storeStream(.{ .slot = slot }) orelse
         return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_LIMIT };
     return .{ .stream = stored, .err = RESOURCE_ERR_NONE };
 }
@@ -3044,7 +3037,7 @@ fn hostedAudioPushStream(host: *RocHost, handle: *u64, samples: abi.RocListWith(
     defer samples.decref(host);
     defer releaseResourceBox(host, handle);
     const resource = stream_heap.get(handle.*) orelse return;
-    resource.ring.push(samples.items());
+    raylib.pushStream(resource.slot, samples.items());
 }
 
 fn exportedAudioPushStream(handle: *u64, samples: abi.RocListWith(f32, false)) callconv(.c) void {
@@ -3054,7 +3047,7 @@ fn exportedAudioPushStream(handle: *u64, samples: abi.RocListWith(f32, false)) c
 fn hostedAudioStreamBuffered(handle: *u64) callconv(.c) u64 {
     defer releaseResourceBox(activeHost(), handle);
     const resource = stream_heap.get(handle.*) orelse return 0;
-    return resource.ring.bufferedFrames();
+    return raylib.streamBuffered(resource.slot);
 }
 
 fn updateMusicResource(resource: *MusicResource) void {
@@ -3066,14 +3059,6 @@ fn updateMusicResource(resource: *MusicResource) void {
 
 fn updateMusicStreams() void {
     music_heap.forEach(updateMusicResource);
-}
-
-fn updateStreamResource(resource: *StreamResource) void {
-    if (resource.native) |stream| raylib.pumpStream(stream, &resource.ring);
-}
-
-fn updateAudioStreams() void {
-    stream_heap.forEach(updateStreamResource);
 }
 
 fn deinitResources() void {
@@ -3927,7 +3912,6 @@ fn runNormalApp(roc_host: *RocHost, allocator: std.mem.Allocator, app_config: Ap
         const frame_time: f32 = if (frame_count == 0) 0 else (fixed_step orelse raylib.getFrameTime());
         const now_ns: u64 = captureAdjustedClock(real_ns, fixed_step);
         updateMusicStreams();
-        updateAudioStreams();
 
         input.updateFromRaylib();
         const mouse_pos = if (virtual_mouse_active)
