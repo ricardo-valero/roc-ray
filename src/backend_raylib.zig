@@ -25,6 +25,9 @@ pub const Sound = rl.Sound;
 /// Native music stream retained in the host resource heap.
 pub const Music = rl.Music;
 
+/// Native PCM stream retained in the host resource heap.
+pub const AudioStream = rl.AudioStream;
+
 /// Native font retained in the host resource heap.
 pub const Font = rl.Font;
 
@@ -1115,7 +1118,9 @@ const MAX_GEN_SOUND_MS: i32 = 5000;
 var gen_sound_buf: [AUDIO_SAMPLE_RATE * @as(usize, @intCast(MAX_GEN_SOUND_MS)) / 1000]i16 = undefined;
 
 /// Initialize the audio device (call once, after the window exists).
+/// The stream buffer default must be set before any stream is loaded.
 pub fn initAudioDevice() void {
+    rl.SetAudioStreamBufferSizeDefault(STREAM_DEVICE_BUFFER_FRAMES);
     rl.InitAudioDevice();
 }
 
@@ -1366,6 +1371,129 @@ pub fn musicTimePlayed(stream: Music) f32 {
 /// Set global audio output volume.
 pub fn setMasterVolume(volume: f32) void {
     rl.SetMasterVolume(clampF32(volume, 0, 1));
+}
+
+// --- PCM streams ----------------------------------------------------------
+
+/// Frames each half of the device-side double buffer holds (~85 ms at 48 kHz).
+pub const STREAM_DEVICE_BUFFER_FRAMES: c_int = 4096;
+
+/// Ring capacity in frames (~250 ms at 48 kHz) - slack above device buffering
+/// so frame-rate pushes absorb scheduling jitter without underrunning.
+pub const STREAM_RING_FRAMES: usize = 12_000;
+
+/// Channel count ceiling; sizes the ring for the widest supported layout.
+pub const STREAM_MAX_CHANNELS: usize = 2;
+
+/// Drop-oldest ring between Roc-side pushes and the audio device. Pure
+/// bookkeeping (no raylib calls) so the headless host shares it and it can be
+/// unit tested. Indices are in samples; `channels` converts to frames.
+pub const StreamRing = struct {
+    samples: [STREAM_RING_FRAMES * STREAM_MAX_CHANNELS]f32 = undefined,
+    channels: usize = STREAM_MAX_CHANNELS,
+    read: usize = 0,
+    len: usize = 0,
+
+    fn capacity(self: *const StreamRing) usize {
+        return STREAM_RING_FRAMES * self.channels;
+    }
+
+    /// Append interleaved samples, overwriting the oldest when full.
+    pub fn push(self: *StreamRing, data: []const f32) void {
+        const cap = self.capacity();
+        // Only the newest `cap` samples can survive; skip anything older.
+        const src = if (data.len > cap) data[data.len - cap ..] else data;
+        for (src) |sample| {
+            const write = (self.read + self.len) % cap;
+            self.samples[write] = sample;
+            if (self.len < cap) {
+                self.len += 1;
+            } else {
+                self.read = (self.read + 1) % cap;
+            }
+        }
+    }
+
+    /// Whole frames currently buffered.
+    pub fn bufferedFrames(self: *const StreamRing) u64 {
+        return @intCast(self.len / self.channels);
+    }
+
+    /// Move up to `out.len` samples out of the ring; returns samples written.
+    pub fn pop(self: *StreamRing, out: []f32) usize {
+        const cap = self.capacity();
+        const count = @min(self.len, out.len);
+        for (out[0..count]) |*sample| {
+            sample.* = self.samples[self.read];
+            self.read = (self.read + 1) % cap;
+        }
+        self.len -= count;
+        return count;
+    }
+};
+
+/// Load a PCM stream (32-bit float samples) and start it playing. An
+/// AudioStream with no queued data outputs silence, so playing immediately
+/// makes underrun the silent default rather than a stall.
+pub fn loadStream(sample_rate: u32, channels: u32) ?AudioStream {
+    const stream = rl.LoadAudioStream(sample_rate, 32, channels);
+    if (!rl.IsAudioStreamValid(stream)) return null;
+    rl.PlayAudioStream(stream);
+    return stream;
+}
+
+/// Unload a native PCM stream when its host resource slot is released.
+pub fn unloadStream(stream: AudioStream) void {
+    rl.StopAudioStream(stream);
+    rl.UnloadAudioStream(stream);
+}
+
+/// Move ring contents to the device while it has room. Called once per frame
+/// alongside music stream updates.
+pub fn pumpStream(stream: AudioStream, ring: *StreamRing) void {
+    var chunk: [@as(usize, STREAM_DEVICE_BUFFER_FRAMES) * STREAM_MAX_CHANNELS]f32 = undefined;
+    while (rl.IsAudioStreamProcessed(stream)) {
+        const budget = @as(usize, STREAM_DEVICE_BUFFER_FRAMES) * ring.channels;
+        const samples = ring.pop(chunk[0..budget]);
+        const frames = samples / ring.channels;
+        if (frames == 0) break;
+        rl.UpdateAudioStream(stream, &chunk, @intCast(frames));
+    }
+}
+
+test "stream ring drops oldest on overrun and keeps memory bounded" {
+    var ring: StreamRing = .{ .channels = 2 };
+    var frame: [2]f32 = undefined;
+    var i: usize = 0;
+    while (i < STREAM_RING_FRAMES + 5) : (i += 1) {
+        frame = .{ @floatFromInt(i), @floatFromInt(i) };
+        ring.push(&frame);
+    }
+    try std.testing.expectEqual(@as(u64, STREAM_RING_FRAMES), ring.bufferedFrames());
+    var out: [2]f32 = undefined;
+    try std.testing.expectEqual(@as(usize, 2), ring.pop(&out));
+    try std.testing.expectEqual(@as(f32, 5), out[0]);
+}
+
+test "stream ring push larger than capacity keeps the newest tail" {
+    var ring: StreamRing = .{ .channels = 1 };
+    var data: [STREAM_RING_FRAMES + 3]f32 = undefined;
+    for (&data, 0..) |*sample, i| sample.* = @floatFromInt(i);
+    ring.push(data[0 .. STREAM_RING_FRAMES + 3]);
+    try std.testing.expectEqual(@as(u64, STREAM_RING_FRAMES), ring.bufferedFrames());
+    var out: [1]f32 = undefined;
+    _ = ring.pop(&out);
+    try std.testing.expectEqual(@as(f32, 3), out[0]);
+}
+
+test "stream ring pop drains and reports empty" {
+    var ring: StreamRing = .{ .channels = 2 };
+    const data = [_]f32{ 1, 2, 3, 4 };
+    ring.push(&data);
+    var out: [8]f32 = undefined;
+    try std.testing.expectEqual(@as(usize, 4), ring.pop(&out));
+    try std.testing.expectEqual(@as(u64, 0), ring.bufferedFrames());
+    try std.testing.expectEqual(@as(usize, 0), ring.pop(&out));
 }
 
 /// Keyboard key enum for type-safe key handling.

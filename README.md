@@ -4,11 +4,15 @@ Make native games, visual tools, and interactive apps in [Roc](https://www.roc-l
 
 > **About this fork** ([ricardo-valero/roc-ray](https://github.com/ricardo-valero/roc-ray)):
 > adds binary file I/O (`Host.read_bytes!` / `Host.write_bytes!`, exercised by
-> `examples/file_io.roc`) and program arguments (`Host.args!` — positional
-> argv entries and everything after `--`; the host's own flags keep working)
-> for [roc-ngb-emu](https://github.com/ricardo-valero/roc-ngb-emu)
-> and roc-nes-emu — runtime ROM loading and battery saves. A PCM audio-stream
-> API is planned next. Only macOS arm64 hosts are built and tested here.
+> `examples/file_io.roc`), program arguments (`Host.args!` — positional
+> argv entries and everything after `--`; the host's own flags keep working),
+> and PCM audio streaming (`Audio.create_stream!` / `stream.push!` /
+> `stream.buffered!` — 32-bit float interleaved samples into a host-owned
+> drop-oldest ring, silence on underrun; exercised by
+> `examples/audio_stream.roc`) for
+> [roc-ngb-emu](https://github.com/ricardo-valero/roc-ngb-emu)
+> and roc-nes-emu — runtime ROM loading, battery saves, and APU sound.
+> Only macOS arm64 hosts are built and tested here.
 > `.roc-version` pins the nightly this fork pairs with (numeric-month form, as
 > the [roc-overlay](https://github.com/roc-lang/roc-overlay) nightlies report it;
 > upstream's glue scripts expect the older spelled-month form). The Zig ABI

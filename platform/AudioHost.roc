@@ -8,9 +8,13 @@ AudioHost := [].{
 
 	Music :: Box(U64)
 
+	Stream :: Box(U64)
+
 	SoundResult : { sound : Sound, err : U8 }
 
 	MusicResult : { music : Music, err : U8 }
+
+	StreamResult : { stream : Stream, err : U8 }
 
 	GenSound : {
 		waveform : U8,
@@ -49,4 +53,7 @@ AudioHost := [].{
 	music_length! : Music => F32
 	music_time_played! : Music => F32
 	set_master_volume! : F32 => {}
+	create_stream! : { channels : U8, sample_rate : U32 } => StreamResult
+	push_stream! : Stream, List(F32) => {}
+	stream_buffered! : Stream => U64
 }

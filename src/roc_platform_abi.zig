@@ -6046,6 +6046,29 @@ comptime {
     }
 }
 
+/// Return type record for AudioHost.create_stream!
+/// Fields ordered by compiler-emitted ABI offsets.
+/// Fork addition: hand-written to match glue conventions (roc glue cannot
+/// link on this machine); layout mirrors AudioHostGen_soundRetRecord.
+pub const AudioHostCreate_streamRetRecord = if (@sizeOf(usize) == 4) extern struct {
+    stream: *u64,
+    err: u8,
+} else extern struct {
+    stream: *u64,
+    err: u8,
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(AudioHostCreate_streamRetRecord) != 16) @compileError("AudioHostCreate_streamRetRecord size mismatch");
+        if (@alignOf(AudioHostCreate_streamRetRecord) != 8) @compileError("AudioHostCreate_streamRetRecord alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(AudioHostCreate_streamRetRecord) != 8) @compileError("AudioHostCreate_streamRetRecord size mismatch");
+        if (@alignOf(AudioHostCreate_streamRetRecord) != 4) @compileError("AudioHostCreate_streamRetRecord alignment mismatch");
+    }
+}
+
 /// Return type record for AudioHost.gen_sound!
 /// Fields ordered by compiler-emitted ABI offsets.
 pub const AudioHostGen_soundRetRecord = if (@sizeOf(usize) == 4) extern struct {
@@ -6499,6 +6522,31 @@ comptime {
     if (@sizeOf(usize) == 4) {
         if (@sizeOf(AssetsHostUpdate_textureArgs) != 16) @compileError("AssetsHostUpdate_textureArgs size mismatch");
         if (@alignOf(AssetsHostUpdate_textureArgs) != 4) @compileError("AssetsHostUpdate_textureArgs alignment mismatch");
+    }
+}
+
+/// Arguments for AudioHost.create_stream!
+/// Roc signature: { channels : U8, sample_rate : U32 } => { err : U8, stream : AudioHost.Stream }
+/// Refcounted fields are owned by the hosted function.
+/// Fork addition: hand-written to match glue conventions (fields laid out by
+/// descending alignment, ties alphabetical - roc glue cannot link on this
+/// machine).
+pub const AudioHostCreate_streamArgs = if (@sizeOf(usize) == 4) extern struct {
+    sample_rate: u32,
+    channels: u8,
+} else extern struct {
+    sample_rate: u32,
+    channels: u8,
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(AudioHostCreate_streamArgs) != 8) @compileError("AudioHostCreate_streamArgs size mismatch");
+        if (@alignOf(AudioHostCreate_streamArgs) != 4) @compileError("AudioHostCreate_streamArgs alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(AudioHostCreate_streamArgs) != 8) @compileError("AudioHostCreate_streamArgs size mismatch");
+        if (@alignOf(AudioHostCreate_streamArgs) != 4) @compileError("AudioHostCreate_streamArgs alignment mismatch");
     }
 }
 
@@ -8485,6 +8533,21 @@ pub extern fn roc_assets_set_texture_wrap_raw(arg0: AssetsHostTexture, arg1: u8)
 /// Hosted symbol for AssetsHost.update_texture!
 /// Roc signature: { pixels : List(Color.Rgba), texture : AssetsHost.Texture } => U8
 pub extern fn roc_assets_update_texture_raw(arg0: AssetsHostUpdate_textureArgs) callconv(.c) u8;
+
+/// Hosted symbol for AudioHost.create_stream!
+/// Roc signature: { channels : U8, sample_rate : U32 } => { err : U8, stream : AudioHost.Stream }
+/// Fork addition: hand-written to match glue conventions.
+pub extern fn roc_audio_create_stream_raw(arg0: AudioHostCreate_streamArgs) callconv(.c) AudioHostCreate_streamRetRecord;
+
+/// Hosted symbol for AudioHost.push_stream!
+/// Roc signature: AudioHost.Stream, List(F32) => {}
+/// Fork addition: hand-written to match glue conventions.
+pub extern fn roc_audio_push_stream_raw(arg0: *u64, arg1: RocListWith(f32, false)) callconv(.c) void;
+
+/// Hosted symbol for AudioHost.stream_buffered!
+/// Roc signature: AudioHost.Stream => U64
+/// Fork addition: hand-written to match glue conventions.
+pub extern fn roc_audio_stream_buffered_raw(arg0: *u64) callconv(.c) u64;
 
 /// Hosted symbol for AudioHost.gen_sound!
 /// Roc signature: { attack_ms : I32, decay_ms : I32, freq_end : F32, freq_start : F32, ms : I32, release_ms : I32, sustain : F32, volume : F32, waveform : U8 } => { err : U8, sound : AudioHost.Sound }
