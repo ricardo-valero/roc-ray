@@ -67,7 +67,11 @@ square_chunk = |start| {
 	var i = 0
 	while i < chunk_frames {
 		t = start + i
-		s = if (t * 880) % (sample_rate * 2) < sample_rate { 0.15 } else { -0.15 }
+		s = if (t * 880) % (sample_rate * 2) < sample_rate {
+			0.15
+		} else {
+			-0.15
+		}
 		out = out.set(i * 2, s) ?? out
 		out = out.set(i * 2 + 1, s) ?? out
 		i = i + 1

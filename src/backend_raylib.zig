@@ -1375,8 +1375,11 @@ pub fn setMasterVolume(volume: f32) void {
 
 // --- PCM streams ----------------------------------------------------------
 
-/// Frames each half of the device-side double buffer holds (~85 ms at 48 kHz).
-pub const STREAM_DEVICE_BUFFER_FRAMES: c_int = 4096;
+/// Frames each half of the device-side double buffer holds (~21 ms at
+/// 48 kHz). UpdateAudioStream marks a whole sub-buffer ready no matter how
+/// few frames were written, so the pump only ever submits exactly this many;
+/// keeping it small keeps latency low and full refills cheap to satisfy.
+pub const STREAM_DEVICE_BUFFER_FRAMES: c_int = 1024;
 
 /// Ring capacity in frames (~250 ms at 48 kHz) - slack above device buffering
 /// so frame-rate pushes absorb scheduling jitter without underrunning.
@@ -1448,15 +1451,17 @@ pub fn unloadStream(stream: AudioStream) void {
     rl.UnloadAudioStream(stream);
 }
 
-/// Move ring contents to the device while it has room. Called once per frame
-/// alongside music stream updates.
+/// Move ring contents to the device while it has room, one full sub-buffer
+/// at a time — a partial UpdateAudioStream would play the sub-buffer's stale
+/// tail. When the ring holds less than a sub-buffer, wait for the next pump;
+/// an unfed stream plays silence. Called once per frame alongside music
+/// stream updates.
 pub fn pumpStream(stream: AudioStream, ring: *StreamRing) void {
     var chunk: [@as(usize, STREAM_DEVICE_BUFFER_FRAMES) * STREAM_MAX_CHANNELS]f32 = undefined;
+    const frames: usize = @intCast(STREAM_DEVICE_BUFFER_FRAMES);
     while (rl.IsAudioStreamProcessed(stream)) {
-        const budget = @as(usize, STREAM_DEVICE_BUFFER_FRAMES) * ring.channels;
-        const samples = ring.pop(chunk[0..budget]);
-        const frames = samples / ring.channels;
-        if (frames == 0) break;
+        if (ring.bufferedFrames() < frames) break;
+        _ = ring.pop(chunk[0 .. frames * ring.channels]);
         rl.UpdateAudioStream(stream, &chunk, @intCast(frames));
     }
 }
