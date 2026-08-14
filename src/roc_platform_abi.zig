@@ -8855,6 +8855,12 @@ pub extern fn roc_host_exit(arg0: i32) callconv(.c) void;
 /// link on this machine).
 pub extern fn roc_host_args() callconv(.c) RocList(RocStr);
 
+/// Hosted symbol for HostHost.unix_time!
+/// Roc signature: {} => U64
+/// Fork addition: hand-written to match glue conventions (roc glue cannot
+/// link on this machine).
+pub extern fn roc_host_unix_time() callconv(.c) u64;
+
 /// Hosted symbol for HostHost.get_clipboard_text!
 /// Roc signature: {} => Try(Str, [Unavailable])
 pub extern fn roc_host_get_clipboard_text() callconv(.c) HostHostGet_clipboard_textResult;

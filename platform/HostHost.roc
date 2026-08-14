@@ -31,5 +31,6 @@ HostHost := [].{
 	set_screen_size! : { width : I32, height : I32 } => Try({}, [NotSupported])
 	set_target_fps! : I32 => {}
 	set_window_min_size! : { width : I32, height : I32 } => {}
+	unix_time! : () => U64
 	write_bytes! : WriteBytes => U8
 }

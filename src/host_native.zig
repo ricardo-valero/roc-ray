@@ -2131,6 +2131,35 @@ fn exportedArgs() callconv(.c) abi.RocList(abi.RocStr) {
     return hostedArgs(activeHost());
 }
 
+// zig 0.16 moved wall clocks behind std.Io; declare the system entry
+// points directly instead (libc `time` everywhere but Windows).
+const unix_time_externs = struct {
+    extern "c" fn time(?*i64) i64;
+    extern "kernel32" fn GetSystemTimeAsFileTime(*std.os.windows.FILETIME) callconv(.winapi) void;
+};
+
+fn exportedUnixTime() callconv(.c) u64 {
+    // Wall clock, not monotonic: epoch seconds for save timestamps and RTCs.
+    // Clamped at 0 for pre-1970 system clocks so the u64 never underflows.
+    switch (builtin.os.tag) {
+        .windows => {
+            var ft: std.os.windows.FILETIME = undefined;
+            unix_time_externs.GetSystemTimeAsFileTime(&ft);
+            const t100: u64 = (@as(u64, ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
+            const epoch_offset_100ns: u64 = 11_644_473_600 * 10_000_000; // 1601 -> 1970
+            if (t100 < epoch_offset_100ns) return 0;
+            return (t100 - epoch_offset_100ns) / 10_000_000;
+        },
+        // the linux lib target builds without libc; go through the syscall layer
+        .linux => {
+            var ts: std.os.linux.timespec = undefined;
+            if (std.os.linux.clock_gettime(.REALTIME, &ts) != 0) return 0;
+            return @intCast(@max(0, ts.sec));
+        },
+        else => return @intCast(@max(0, unix_time_externs.time(null))),
+    }
+}
+
 fn hostedTilemapLoadTmxRaw(roc_host: *RocHost, path_arg: abi.RocStr) callconv(.c) TilemapLoadTmxRawResult {
     defer path_arg.decref(roc_host);
 
@@ -3182,6 +3211,7 @@ comptime {
         @export(if (builtin.os.tag == .windows) &exportedReadEnvWindows else &exportedReadEnvPosix, .{ .name = "roc_host_read_env" });
         @export(&exportedReadBytesRaw, .{ .name = "roc_host_read_bytes_raw" });
         @export(&exportedReadFileRaw, .{ .name = "roc_host_read_file_raw" });
+        @export(&exportedUnixTime, .{ .name = "roc_host_unix_time" });
         @export(&exportedWriteBytesRaw, .{ .name = "roc_host_write_bytes_raw" });
         @export(&exportedSetClipboardText, .{ .name = "roc_host_set_clipboard_text" });
         @export(&hostedSetExitKey, .{ .name = "roc_host_set_exit_key" });

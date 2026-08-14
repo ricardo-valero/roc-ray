@@ -84,6 +84,14 @@ Host := {
 	args! : Host => List(Str)
 	args! = |_host| HostHost.args!()
 
+	## Current wall-clock time as UNIX epoch seconds. Unlike the monotonic
+	## `timestamp_nanos`, this is real calendar time: it can jump if the
+	## system clock changes, and it is the right source for anything that
+	## must survive the process (save timestamps, real-time clocks).
+	## Receiver form: `host.unix_time!()`.
+	unix_time! : Host => U64
+	unix_time! = |_host| HostHost.unix_time!()
+
 	## Exit the application with the given exit code.
 	## The exit happens after the current frame completes to allow proper cleanup.
 	exit! : Host, I32 => {}
