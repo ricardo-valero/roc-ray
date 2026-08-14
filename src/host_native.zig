@@ -477,6 +477,44 @@ fn allocatorFromHost(host: *RocHost) std.mem.Allocator {
     return env.allocator;
 }
 
+// Roc's heap goes through libc malloc rather than smp_allocator: apps that
+// clone big lists every frame (emulators) otherwise hit the page allocator's
+// mmap/munmap round trip plus fresh zero pages on each clone. The host builds
+// freestanding, so malloc/realloc/free are extern and resolve at final link,
+// the same way raylib's own calls do. malloc guarantees 16-byte alignment on
+// every supported target, which covers all Roc allocations.
+extern fn malloc(len: usize) ?*anyopaque;
+extern fn realloc(ptr: ?*anyopaque, len: usize) ?*anyopaque;
+extern fn free(ptr: ?*anyopaque) void;
+
+const malloc_allocator: std.mem.Allocator = .{
+    .ptr = undefined,
+    .vtable = &.{
+        .alloc = mallocAlloc,
+        .resize = mallocResize,
+        .remap = mallocRemap,
+        .free = mallocFree,
+    },
+};
+
+fn mallocAlloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, _: usize) ?[*]u8 {
+    if (alignment.toByteUnits() > 16) return null;
+    return @ptrCast(malloc(len));
+}
+
+fn mallocResize(_: *anyopaque, memory: []u8, _: std.mem.Alignment, new_len: usize, _: usize) bool {
+    return new_len <= memory.len;
+}
+
+fn mallocRemap(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: usize, _: usize) ?[*]u8 {
+    if (alignment.toByteUnits() > 16) return null;
+    return @ptrCast(realloc(memory.ptr, new_len));
+}
+
+fn mallocFree(_: *anyopaque, memory: []u8, _: std.mem.Alignment, _: usize) void {
+    free(memory.ptr);
+}
+
 fn defaultIo() std.Io {
     if (comptime builtin.is_test) {
         return std.testing.io;
@@ -4077,7 +4115,7 @@ fn platform_main(argc: usize, argv: [*][*:0]u8) c_int {
     const allocator = if (use_debug_allocator)
         debug_allocator.allocator()
     else
-        std.heap.smp_allocator;
+        malloc_allocator;
 
     // The Roc runtime environment: allocator + I/O backend. We supply our own
     // dbg/expect/crashed handlers below, so the I/O backend (only used by the
