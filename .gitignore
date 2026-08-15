@@ -19,6 +19,8 @@ examples/generated_assets
 examples/post_process
 examples/projective_texture
 examples/responsive_ui
+examples/audio_stream
+examples/file_io
 
 # Built executables at root
 hello_world
