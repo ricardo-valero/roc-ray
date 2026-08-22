@@ -16,7 +16,12 @@ Gamepad := [].{
 	}
 
 	## One of the four gamepad slots sampled by the platform.
-	GamepadId := [One, Two, Three, Four]
+	GamepadId := [One, Two, Three, Four].{
+		# The nightly stopped deriving == for nominal tag unions; equality
+		# by slot index keeps `pad.id() == One` working for apps.
+		is_eq : GamepadId, GamepadId -> Bool
+		is_eq = |a, b| index(a) == index(b)
+	}
 
 	## Validate and wrap a zero-based gamepad index.
 	from_index : U64 -> Try(GamepadId, [InvalidGamepadIndex, ..])
