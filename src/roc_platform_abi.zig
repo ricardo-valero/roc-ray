@@ -877,10 +877,10 @@ comptime {
 
 /// Element type for Color.Rgba
 pub const ColorRgba = if (@sizeOf(usize) == 4) extern struct {
-    a: u8,
-    b: u8,
-    g: u8,
     r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
     /// Recursively decrement Roc-owned fields.
     pub fn decref(self: @This(), roc_host: *RocHost) void {
         const value = self;
@@ -895,10 +895,10 @@ pub const ColorRgba = if (@sizeOf(usize) == 4) extern struct {
         _ = amount;
     }
 } else extern struct {
-    a: u8,
-    b: u8,
-    g: u8,
     r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
     /// Recursively decrement Roc-owned fields.
     pub fn decref(self: @This(), roc_host: *RocHost) void {
         const value = self;
@@ -7325,10 +7325,10 @@ comptime {
 /// Roc signature: Color.Rgba => {}
 /// Refcounted fields are owned by the hosted function.
 pub const DrawHostClearArgs = if (@sizeOf(usize) == 4) extern struct {
-    a: u8,
-    b: u8,
-    g: u8,
     r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
     /// Recursively decrement Roc-owned fields.
     pub fn decref(self: @This(), roc_host: *RocHost) void {
         const value = self;
@@ -7343,10 +7343,10 @@ pub const DrawHostClearArgs = if (@sizeOf(usize) == 4) extern struct {
         _ = amount;
     }
 } else extern struct {
-    a: u8,
-    b: u8,
-    g: u8,
     r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
     /// Recursively decrement Roc-owned fields.
     pub fn decref(self: @This(), roc_host: *RocHost) void {
         const value = self;

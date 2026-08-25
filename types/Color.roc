@@ -20,6 +20,9 @@ Color := [].{
 		g : U8,
 		b : U8,
 		a : U8,
+		# Opt into declared-order layout: the host uploads pixel lists to
+		# R8G8B8A8 textures as raw bytes, so memory order must be r,g,b,a.
+		_ : {},
 	}.{
 
 		## Compare all four color channels for equality.
