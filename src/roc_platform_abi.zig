@@ -777,10 +777,12 @@ comptime {
 
 /// Element type for Color.Rgba
 pub const ColorRgba = if (@sizeOf(usize) == 4) extern struct {
-    r: u8,
-    g: u8,
-    b: u8,
+    // nightly-2026-08-20 lays equal-size record fields alphabetically:
+    // Roc's { r, g, b, a } arrives in memory as a, b, g, r
     a: u8,
+    b: u8,
+    g: u8,
+    r: u8,
     /// Recursively decrement Roc-owned fields.
     pub fn decref(self: @This(), roc_host: *RocHost) void {
         const value = self;
@@ -795,10 +797,10 @@ pub const ColorRgba = if (@sizeOf(usize) == 4) extern struct {
         _ = amount;
     }
 } else extern struct {
-    r: u8,
-    g: u8,
-    b: u8,
     a: u8,
+    b: u8,
+    g: u8,
+    r: u8,
     /// Recursively decrement Roc-owned fields.
     pub fn decref(self: @This(), roc_host: *RocHost) void {
         const value = self;
