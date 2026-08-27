@@ -40,6 +40,7 @@ pub const Kind = enum(u8) {
     udp_socket,
     sqlite_db,
     sqlite_stmt,
+    stream,
 
     comptime {
         // Zero is the reserved "not a token" byte; `decodeToken` rejects it.

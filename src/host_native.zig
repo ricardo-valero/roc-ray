@@ -3522,6 +3522,12 @@ const StoreResource = struct {
     root: std.Io.Dir,
 };
 
+/// PCM stream: the backend owns the slot (ring + device stream + audio-thread
+/// callback); the heap entry just ties the slot's lifetime to the Roc box.
+const StreamResource = struct {
+    slot: usize,
+};
+
 const TilemapQuadProbe = tilemap_batch.Quad;
 
 fn destroySound(resource: *SoundResource) void {
@@ -3591,6 +3597,10 @@ fn destroyUdpSocket(resource: *udp_effect.Socket) void {
     resource.inner.close();
 }
 
+fn destroyStream(resource: *StreamResource) void {
+    raylib.closeStream(resource.slot);
+}
+
 fn writeU64Token(payload: *u64, token: u64) void {
     payload.* = token;
 }
@@ -3607,6 +3617,7 @@ const RenderTextureHeap = host_resource.HostResourceHeap(u64, RenderTextureResou
 const ShaderHeap = host_resource.HostResourceHeap(u64, ShaderResource, 32, .shader, writeU64Token, readU64Token, destroyShader);
 const PreparedTextHeap = host_resource.HostResourceHeap(u64, PreparedTextResource, 256, .prepared_text, writeU64Token, readU64Token, destroyPreparedText);
 const StoreHeap = host_resource.HostResourceHeap(u64, StoreResource, 16, .store, writeU64Token, readU64Token, destroyStore);
+const StreamHeap = host_resource.HostResourceHeap(u64, StreamResource, 4, .stream, writeU64Token, readU64Token, destroyStream);
 
 /// How many UDP sockets an app may hold open at once.
 ///
@@ -3697,6 +3708,7 @@ var file_bytes_delivery_reservations = FileBytesDeliveryReservations{};
 
 var sound_heap: SoundHeap = .{};
 var music_heap: MusicHeap = .{};
+var stream_heap: StreamHeap = .{};
 var font_heap: FontHeap = .{};
 const StartupFontConfig = struct {
     path: []const u8 = &.{},
@@ -3718,6 +3730,7 @@ var udp_socket_heap: UdpSocketHeap = .{};
 const resource_heaps = .{
     &sound_heap,
     &music_heap,
+    &stream_heap,
     &font_heap,
     &texture_heap,
     &render_texture_heap,
@@ -5349,6 +5362,34 @@ test "render target textures report not mutable and release ownership" {
     try std.testing.expectEqual(@as(usize, 0), render_texture_heap.active());
 }
 
+test "headless stream buffers pushes, reports depth, and frees on release" {
+    var roc_env = abi.RocEnv{ .allocator = std.testing.allocator, .roc_io = abi.RocIo.freestanding() };
+    var roc_host = abi.makeRocHost(&roc_env);
+    roc_host.roc_dealloc = &nativeRocDealloc;
+    active_roc_host = &roc_host;
+    active_headless = true;
+    defer {
+        active_headless = false;
+        active_roc_host = null;
+    }
+
+    try std.testing.expectEqual(RESOURCE_ERR_FAILED, hostedAudioCreateStream(.{ .channels = 3, .sample_rate = 48000 }).err);
+    try std.testing.expectEqual(RESOURCE_ERR_FAILED, hostedAudioCreateStream(.{ .channels = 2, .sample_rate = 0 }).err);
+
+    const created = hostedAudioCreateStream(.{ .channels = 2, .sample_rate = 48000 });
+    try std.testing.expectEqual(RESOURCE_ERR_NONE, created.err);
+    try std.testing.expectEqual(@as(usize, 1), stream_heap.active());
+
+    const samples = [_]f32{ 0.1, -0.1, 0.2, -0.2 };
+    const list = abi.RocListWith(f32, false).fromSlice(&samples, &roc_host);
+    abi.increfBox(@ptrCast(created.stream), 2);
+    hostedAudioPushStream(&roc_host, created.stream, list);
+    try std.testing.expectEqual(@as(u64, 2), hostedAudioStreamBuffered(created.stream));
+
+    releaseResourceBox(&roc_host, created.stream);
+    try std.testing.expectEqual(@as(usize, 0), stream_heap.active());
+}
+
 test "every fixed resource heap reports capacity plus one as ResourceLimit" {
     var roc_env = abi.RocEnv{ .allocator = std.testing.allocator, .roc_io = abi.RocIo.freestanding() };
     var roc_host = abi.makeRocHost(&roc_env);
@@ -5368,6 +5409,11 @@ test "every fixed resource heap reports capacity plus one as ResourceLimit" {
     for (&sounds) |*sound| sound.* = storeSound(.headless).?;
     try std.testing.expectEqual(RESOURCE_ERR_LIMIT, hostedAudioGenTone(.{ .freq = 440, .ms = 20 }).err);
     for (sounds) |sound| releaseResourceBox(&roc_host, sound);
+
+    var streams: [4]*u64 = undefined;
+    for (&streams) |*item| item.* = storeStream(.{ .slot = raylib.openStream(48000, 2, true).? }).?;
+    try std.testing.expectEqual(RESOURCE_ERR_LIMIT, hostedAudioCreateStream(.{ .channels = 2, .sample_rate = 48000 }).err);
+    for (streams) |item| releaseResourceBox(&roc_host, item);
 
     var music: [16]*u64 = undefined;
     for (&music) |*item| item.* = storeMusic(.headless).?;
@@ -8384,6 +8430,14 @@ fn storeMusic(resource: MusicResource) ?*u64 {
     };
 }
 
+fn storeStream(resource: StreamResource) ?*u64 {
+    return stream_heap.insert(0, resource) orelse {
+        var rejected = resource;
+        destroyStream(&rejected);
+        return null;
+    };
+}
+
 fn hostedAudioGenTone(args: abi.AudioHostGen_toneArgs) callconv(.c) abi.AudioHostGen_toneRetRecord {
     enforcePhase("Audio.gen_tone!", during_load);
     const effect = EffectScope.begin("Audio.gen_tone!", 0);
@@ -8828,6 +8882,35 @@ fn hostedAudioSetMasterVolume(volume: f32) callconv(.c) void {
     raylib.setMasterVolume(volume);
 }
 
+fn hostedAudioCreateStream(args: abi.AudioHostCreate_streamArgs) callconv(.c) abi.AudioHostCreate_streamRetRecord {
+    if (args.sample_rate == 0 or args.channels < 1 or args.channels > raylib.STREAM_MAX_CHANNELS)
+        return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_FAILED };
+    if (stream_heap.active() >= raylib.STREAM_SLOTS)
+        return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_LIMIT };
+    const slot = raylib.openStream(args.sample_rate, args.channels, headlessMode()) orelse
+        return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_FAILED };
+    const stored = storeStream(.{ .slot = slot }) orelse
+        return .{ .stream = invalidResourceHandle(), .err = RESOURCE_ERR_LIMIT };
+    return .{ .stream = stored, .err = RESOURCE_ERR_NONE };
+}
+
+fn hostedAudioPushStream(host: *RocHost, handle: *u64, samples: abi.RocListWith(f32, false)) callconv(.c) void {
+    defer samples.decref(host);
+    defer releaseResourceBox(host, handle);
+    const resource = stream_heap.get(handle.*) orelse return;
+    raylib.pushStream(resource.slot, samples.items());
+}
+
+fn exportedAudioPushStream(handle: *u64, samples: abi.RocListWith(f32, false)) callconv(.c) void {
+    hostedAudioPushStream(activeHost(), handle, samples);
+}
+
+fn hostedAudioStreamBuffered(handle: *u64) callconv(.c) u64 {
+    defer releaseResourceBox(activeHost(), handle);
+    const resource = stream_heap.get(handle.*) orelse return 0;
+    return raylib.streamBuffered(resource.slot);
+}
+
 fn updateMusicResource(resource: *MusicResource) void {
     switch (resource.*) {
         .headless => {},
@@ -8885,7 +8968,9 @@ fn deinitResources() void {
     sqlite_effect.shutdown();
     file_bytes_heap.deinitAll();
     store_heap.deinitAll();
+    std.debug.assert(stream_heap.active() == 0);
     shader_heap.deinitAll();
+    stream_heap.deinitAll();
     prepared_text_heap.deinitAll();
     render_texture_heap.deinitAll();
     texture_heap.deinitAll();
@@ -8925,6 +9010,9 @@ comptime {
         @export(&exportedAssetsUpdateTextureRegionRaw, .{ .name = "roc_assets_update_texture_region_raw" });
         @export(&hostedAssetsSetTextureFilterRaw, .{ .name = "roc_assets_set_texture_filter_raw" });
         @export(&hostedAssetsSetTextureWrapRaw, .{ .name = "roc_assets_set_texture_wrap_raw" });
+        @export(&hostedAudioCreateStream, .{ .name = "roc_audio_create_stream_raw" });
+        @export(&exportedAudioPushStream, .{ .name = "roc_audio_push_stream_raw" });
+        @export(&hostedAudioStreamBuffered, .{ .name = "roc_audio_stream_buffered_raw" });
         @export(&hostedAudioGenSound, .{ .name = "roc_audio_gen_sound_raw" });
         @export(&hostedAudioGenTone, .{ .name = "roc_audio_gen_tone_raw" });
         @export(&exportedAudioLoadMusic, .{ .name = "roc_audio_load_music_raw" });
@@ -10300,6 +10388,8 @@ fn drainRetiredResourcesUpTo(limit: usize) void {
     budget -= font_heap.drainRetired(budget);
     budget -= music_heap.drainRetired(budget);
     budget -= sound_heap.drainRetired(budget);
+    // Streams close a device-facing slot; cheap, same class as sounds.
+    budget -= stream_heap.drainRetired(budget);
 }
 
 fn drawCaptureCursorOverlay() void {

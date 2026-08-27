@@ -8,6 +8,24 @@ RocRay is a focused app platform, not a game engine. Your app keeps its own
 state and rules; RocRay provides drawing, audio, keyboard and mouse input,
 windows, recording, files, and networking. It runs on macOS (Intel and Apple
 Silicon), Linux x64, and Windows x64.
+> **About this fork** ([ricardo-valero/roc-ray](https://github.com/ricardo-valero/roc-ray)):
+> adds binary file I/O (`Host.read_bytes!` / `Host.write_bytes!`, exercised by
+> `examples/file_io.roc`), program arguments (`Host.args!` — positional
+> argv entries and everything after `--`; the host's own flags keep working),
+> and PCM audio streaming (`Audio.create_stream!` / `stream.push!` /
+> `stream.buffered!` — 32-bit float interleaved samples into a host-owned
+> drop-oldest ring, silence on underrun; exercised by
+> `examples/audio_stream.roc`) for
+> [roc-ngb-emu](https://github.com/ricardo-valero/roc-ngb-emu)
+> and roc-nes-emu — runtime ROM loading, battery saves, and APU sound.
+> Only macOS arm64 hosts are built and tested here.
+> `.roc-version` pins the nightly this fork pairs with (numeric-month form, as
+> the [roc-overlay](https://github.com/roc-lang/roc-overlay) nightlies report it;
+> upstream's glue scripts expect the older spelled-month form). The Zig ABI
+> additions in `src/roc_platform_abi.zig` are hand-written to glue conventions
+> because `roc glue` cannot currently link on the maintenance machine. After
+> rebuilding the host with `zig build`, pass `--no-cache` to `roc build` or a
+> stale cached host may mask your change.
 
 ## See what it can do
 

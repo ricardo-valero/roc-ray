@@ -220,6 +220,23 @@ Audio := [].{
 		stub = { resource: AudioHost.Music.stub }
 	}
 
+	## Host-owned PCM output stream for app-generated audio (32-bit float
+	## interleaved samples). The host buffers pushes and feeds the device each
+	## frame: underrun plays silence and resumes cleanly, sustained overrun
+	## drops the oldest samples so memory stays bounded.
+	Stream :: { resource : AudioHost.Stream }.{
+
+		## Append interleaved F32 samples (frame = one sample per channel).
+		## Push everything generated since the last frame; the host owns pacing.
+		push! : Stream, List(F32) => {}
+		push! = |stream, samples| AudioHost.push_stream!(stream.resource, samples)
+
+		## Frames buffered but not yet delivered to the audio device. Apps that
+		## generate faster than real time can use this to regulate production.
+		buffered! : Stream => U64
+		buffered! = |stream| AudioHost.stream_buffered!(stream.resource)
+	}
+
 	## Procedural waveform used by `gen_sound!`.
 	Waveform := [Sine, Square, Triangle, Saw, Noise]
 
@@ -285,6 +302,12 @@ Audio := [].{
 			volume: 0.55,
 		})
 
+	## Create a PCM output stream (F32 interleaved samples at `sample_rate`,
+	## 1 or 2 `channels`). Keep the returned value in the app model and feed it
+	## with `stream.push!`.
+	create_stream! : { sample_rate : U32, channels : U8 } => Try(Stream, [StreamCreateFailed, ResourceLimit, ..])
+	create_stream! = |cfg| stream_from_resource(AudioHost.create_stream!({ channels: cfg.channels, sample_rate: cfg.sample_rate }))
+
 	## Set global output volume for all sounds and music, clamped to 0 through 1.
 	##
 	## Legal in `init!`, `update!`, and tasks; refused in `render!`.
@@ -306,6 +329,10 @@ generated_sound_from_resource = |result|
 music_from_resource : AudioHost.MusicResult -> Try(Audio.Music, [MusicLoadFailed, ResourceLimit, ..])
 music_from_resource = |result|
 	if result.err == 2 Err(ResourceLimit) else if result.err != 0 Err(MusicLoadFailed) else Ok({ resource: result.music })
+
+stream_from_resource : AudioHost.StreamResult -> Try(Audio.Stream, [StreamCreateFailed, ResourceLimit, ..])
+stream_from_resource = |result|
+	if result.err == 2 Err(ResourceLimit) else if result.err != 0 Err(StreamCreateFailed) else Ok({ resource: result.stream })
 
 waveform_code : Audio.Waveform -> U8
 waveform_code = |waveform|

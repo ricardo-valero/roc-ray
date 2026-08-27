@@ -1417,6 +1417,94 @@ comptime {
     }
 }
 
+/// Element type for __AnonStruct_3bbfb43dbf939738
+pub const __AnonStruct_3bbfb43dbf939738 = if (@sizeOf(usize) == 4) extern struct {
+    stream: *u64,
+    err: u8,
+    /// Recursively decrement Roc-owned fields.
+    pub fn decref(self: @This(), roc_host: *RocHost) void {
+        const value = self;
+        decrefBoxWith(@ptrCast(value.stream), @alignOf(u64), false, null, roc_host);
+    }
+
+    /// Increment Roc-owned fields.
+    pub fn incref(self: @This(), amount: isize) void {
+        const value = self;
+        increfBox(@ptrCast(value.stream), amount);
+    }
+} else extern struct {
+    stream: *u64,
+    err: u8,
+    /// Recursively decrement Roc-owned fields.
+    pub fn decref(self: @This(), roc_host: *RocHost) void {
+        const value = self;
+        decrefBoxWith(@ptrCast(value.stream), @alignOf(u64), false, null, roc_host);
+    }
+
+    /// Increment Roc-owned fields.
+    pub fn incref(self: @This(), amount: isize) void {
+        const value = self;
+        increfBox(@ptrCast(value.stream), amount);
+    }
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(__AnonStruct_3bbfb43dbf939738) != 16) @compileError("__AnonStruct_3bbfb43dbf939738 size mismatch");
+        if (@alignOf(__AnonStruct_3bbfb43dbf939738) != 8) @compileError("__AnonStruct_3bbfb43dbf939738 alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(__AnonStruct_3bbfb43dbf939738) != 8) @compileError("__AnonStruct_3bbfb43dbf939738 size mismatch");
+        if (@alignOf(__AnonStruct_3bbfb43dbf939738) != 4) @compileError("__AnonStruct_3bbfb43dbf939738 alignment mismatch");
+    }
+}
+
+/// Element type for __AnonStruct_b90fe3bb5571bbd8
+pub const __AnonStruct_b90fe3bb5571bbd8 = if (@sizeOf(usize) == 4) extern struct {
+    sample_rate: u32,
+    channels: u8,
+    /// Recursively decrement Roc-owned fields.
+    pub fn decref(self: @This(), roc_host: *RocHost) void {
+        const value = self;
+        _ = value;
+        _ = roc_host;
+    }
+
+    /// Increment Roc-owned fields.
+    pub fn incref(self: @This(), amount: isize) void {
+        const value = self;
+        _ = value;
+        _ = amount;
+    }
+} else extern struct {
+    sample_rate: u32,
+    channels: u8,
+    /// Recursively decrement Roc-owned fields.
+    pub fn decref(self: @This(), roc_host: *RocHost) void {
+        const value = self;
+        _ = value;
+        _ = roc_host;
+    }
+
+    /// Increment Roc-owned fields.
+    pub fn incref(self: @This(), amount: isize) void {
+        const value = self;
+        _ = value;
+        _ = amount;
+    }
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(__AnonStruct_b90fe3bb5571bbd8) != 8) @compileError("__AnonStruct_b90fe3bb5571bbd8 size mismatch");
+        if (@alignOf(__AnonStruct_b90fe3bb5571bbd8) != 4) @compileError("__AnonStruct_b90fe3bb5571bbd8 alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(__AnonStruct_b90fe3bb5571bbd8) != 8) @compileError("__AnonStruct_b90fe3bb5571bbd8 size mismatch");
+        if (@alignOf(__AnonStruct_b90fe3bb5571bbd8) != 4) @compileError("__AnonStruct_b90fe3bb5571bbd8 alignment mismatch");
+    }
+}
+
 /// Element type for __AnonStruct_e20342da83229f51
 pub const __AnonStruct_e20342da83229f51 = if (@sizeOf(usize) == 4) extern struct {
     wheel: f32,
@@ -7452,6 +7540,27 @@ comptime {
     }
 }
 
+/// Return type record for AudioHost.create_stream!
+/// Fields ordered by compiler-emitted ABI offsets.
+pub const AudioHostCreate_streamRetRecord = if (@sizeOf(usize) == 4) extern struct {
+    stream: *u64,
+    err: u8,
+} else extern struct {
+    stream: *u64,
+    err: u8,
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(AudioHostCreate_streamRetRecord) != 16) @compileError("AudioHostCreate_streamRetRecord size mismatch");
+        if (@alignOf(AudioHostCreate_streamRetRecord) != 8) @compileError("AudioHostCreate_streamRetRecord alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(AudioHostCreate_streamRetRecord) != 8) @compileError("AudioHostCreate_streamRetRecord size mismatch");
+        if (@alignOf(AudioHostCreate_streamRetRecord) != 4) @compileError("AudioHostCreate_streamRetRecord alignment mismatch");
+    }
+}
+
 /// Return type record for DrawHost.startup_default_font!
 /// Fields ordered by compiler-emitted ABI offsets.
 pub const DrawHostStartup_default_fontRetRecord = if (@sizeOf(usize) == 4) extern struct {
@@ -8832,6 +8941,69 @@ pub const AudioHostMusic_time_playedArgs = extern struct {
 /// Refcounted fields are owned by the hosted function.
 pub const AudioHostSet_master_volumeArgs = extern struct {
     arg0: f32,
+};
+
+/// Arguments for AudioHost.create_stream!
+/// Roc signature: { channels : U8, sample_rate : U32 } => { err : U8, stream : AudioHost.Stream }
+/// Refcounted fields are owned by the hosted function.
+pub const AudioHostCreate_streamArgs = if (@sizeOf(usize) == 4) extern struct {
+    sample_rate: u32,
+    channels: u8,
+    /// Recursively decrement Roc-owned fields.
+    pub fn decref(self: @This(), roc_host: *RocHost) void {
+        const value = self;
+        _ = value;
+        _ = roc_host;
+    }
+
+    /// Increment Roc-owned fields.
+    pub fn incref(self: @This(), amount: isize) void {
+        const value = self;
+        _ = value;
+        _ = amount;
+    }
+} else extern struct {
+    sample_rate: u32,
+    channels: u8,
+    /// Recursively decrement Roc-owned fields.
+    pub fn decref(self: @This(), roc_host: *RocHost) void {
+        const value = self;
+        _ = value;
+        _ = roc_host;
+    }
+
+    /// Increment Roc-owned fields.
+    pub fn incref(self: @This(), amount: isize) void {
+        const value = self;
+        _ = value;
+        _ = amount;
+    }
+};
+
+comptime {
+    if (@sizeOf(usize) == 8) {
+        if (@sizeOf(AudioHostCreate_streamArgs) != 8) @compileError("AudioHostCreate_streamArgs size mismatch");
+        if (@alignOf(AudioHostCreate_streamArgs) != 4) @compileError("AudioHostCreate_streamArgs alignment mismatch");
+    }
+    if (@sizeOf(usize) == 4) {
+        if (@sizeOf(AudioHostCreate_streamArgs) != 8) @compileError("AudioHostCreate_streamArgs size mismatch");
+        if (@alignOf(AudioHostCreate_streamArgs) != 4) @compileError("AudioHostCreate_streamArgs alignment mismatch");
+    }
+}
+
+/// Arguments for AudioHost.push_stream!
+/// Roc signature: AudioHost.Stream, List(F32) => {}
+/// Refcounted fields are owned by the hosted function.
+pub const AudioHostPush_streamArgs = extern struct {
+    arg0: *u64,
+    arg1: RocListWith(f32, false),
+};
+
+/// Arguments for AudioHost.stream_buffered!
+/// Roc signature: AudioHost.Stream => U64
+/// Refcounted fields are owned by the hosted function.
+pub const AudioHostStream_bufferedArgs = extern struct {
+    arg0: *u64,
 };
 
 /// Arguments for DrawHost.begin_scissor!
@@ -11902,6 +12074,8 @@ pub const AudioHostGen_soundArg0 = __AnonStruct_37b6eb678c2c2ca2;
 pub const AudioHostGen_sound = __AnonStruct_82ca12cef4f5714b;
 pub const AudioHostLoad_sound = __AnonStruct_82ca12cef4f5714b;
 pub const AudioHostLoad_music = __AnonStruct_71f03d460dd53e7d;
+pub const AudioHostCreate_streamArg0 = __AnonStruct_b90fe3bb5571bbd8;
+pub const AudioHostCreate_stream = __AnonStruct_3bbfb43dbf939738;
 pub const DrawHostBegin_scissorArg0 = __AnonStruct_5d393593a1f032cb;
 pub const DrawHostCircle_gradientArg0 = __AnonStruct_f8a458371716c148;
 pub const DrawHostCircle_linesArg0 = __AnonStruct_8b18bd818a3a6ac2;
@@ -12109,6 +12283,18 @@ pub const __AnonStruct_37b6eb678c2c2ca2Release = struct {
 
 pub const __AnonStruct_71f03d460dd53e7dRelease = struct {
     pub fn release(value: __AnonStruct_71f03d460dd53e7d, roc_host: *RocHost) void {
+        value.decref(roc_host);
+    }
+};
+
+pub const __AnonStruct_3bbfb43dbf939738Release = struct {
+    pub fn release(value: __AnonStruct_3bbfb43dbf939738, roc_host: *RocHost) void {
+        value.decref(roc_host);
+    }
+};
+
+pub const __AnonStruct_b90fe3bb5571bbd8Release = struct {
+    pub fn release(value: __AnonStruct_b90fe3bb5571bbd8, roc_host: *RocHost) void {
         value.decref(roc_host);
     }
 };
@@ -13000,6 +13186,8 @@ fn rocReleasePolicy(comptime T: type) type {
     if (T == __AnonStruct_307d51efe2380633) return __AnonStruct_307d51efe2380633Release;
     if (T == __AnonStruct_82ca12cef4f5714b) return __AnonStruct_82ca12cef4f5714bRelease;
     if (T == __AnonStruct_71f03d460dd53e7d) return __AnonStruct_71f03d460dd53e7dRelease;
+    if (T == __AnonStruct_3bbfb43dbf939738) return __AnonStruct_3bbfb43dbf939738Release;
+    if (T == RocListWith(f32, false)) return RocListSpineRelease(RocListWith(f32, false));
     if (T == __AnonStruct_c3425bb1e3730c6e) return __AnonStruct_c3425bb1e3730c6eRelease;
     if (T == RocListWith(u64, false)) return RocListSpineRelease(RocListWith(u64, false));
     if (T == RocListWith(u32, false)) return RocListSpineRelease(RocListWith(u32, false));
@@ -13089,7 +13277,6 @@ fn rocReleasePolicy(comptime T: type) type {
     if (T == __AnonStruct_1339741edbb01404) return __AnonStruct_1339741edbb01404Release;
     if (T == RocListWith(__AnonStruct_59fc16acdd7d0c98, false)) return RocListSpineRelease(RocListWith(__AnonStruct_59fc16acdd7d0c98, false));
     if (T == __AnonStruct_1c8617e96852f779) return __AnonStruct_1c8617e96852f779Release;
-    if (T == RocListWith(f32, false)) return RocListSpineRelease(RocListWith(f32, false));
     if (T == MouseSnapshot) return MouseSnapshotRelease;
     if (T == RocList(__AnonStruct_66bf628355bb7f8e)) return RocListRelease(RocList(__AnonStruct_66bf628355bb7f8e), __AnonStruct_66bf628355bb7f8eRelease);
     if (T == __AnonStruct_66bf628355bb7f8e) return __AnonStruct_66bf628355bb7f8eRelease;
@@ -13345,6 +13532,26 @@ pub extern fn roc_audio_music_time_played_raw(arg0: *u64) callconv(.c) f32;
 /// Hosted symbol for AudioHost.set_master_volume!
 /// Roc signature: F32 => {}
 pub extern fn roc_audio_set_master_volume_raw(arg0: f32) callconv(.c) void;
+
+/// Hosted symbol for AudioHost.create_stream!
+/// Roc signature: { channels : U8, sample_rate : U32 } => { err : U8, stream : AudioHost.Stream }
+/// The result is owned by Roc: return exactly one owned reference.
+pub extern fn roc_audio_create_stream_raw(arg0: AudioHostCreate_streamArgs) callconv(.c) __AnonStruct_3bbfb43dbf939738;
+
+/// Hosted symbol for AudioHost.push_stream!
+/// Roc signature: AudioHost.Stream, List(F32) => {}
+/// Owned arguments. Release each exactly once before returning, unless it is
+/// moved into storage or into the result:
+///     decrefBoxWith(@ptrCast(arg0), @alignOf(u64), false, null, roc_host);
+///     arg1.decref(roc_host);
+pub extern fn roc_audio_push_stream_raw(arg0: *u64, arg1: RocListWith(f32, false)) callconv(.c) void;
+
+/// Hosted symbol for AudioHost.stream_buffered!
+/// Roc signature: AudioHost.Stream => U64
+/// Owned arguments. Release each exactly once before returning, unless it is
+/// moved into storage or into the result:
+///     decrefBoxWith(@ptrCast(arg0), @alignOf(u64), false, null, roc_host);
+pub extern fn roc_audio_stream_buffered_raw(arg0: *u64) callconv(.c) u64;
 
 /// Hosted symbol for DrawHost.begin_scissor!
 /// Roc signature: { height : F32, width : F32, x : F32, y : F32 } => U8
